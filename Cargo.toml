@@ -1,0 +1,40 @@
+[workspace]
+members = ["d-bert","mistral", "library", "rag"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+description = "Minimalist ML framework."
+repository = "https://github.com/dommyrock/doc-rag-demo"
+keywords = ["blas", "tensor", "machine-learning"]
+categories = ["science"]
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+anyhow = "1.0.75"
+tokio = { version = "1.12.0", features = ["full"] }
+serde_json = "1.0.108"
+env_logger = "0.10.0"
+rand = "0.8.5"
+clap = "4.5.4"
+qdrant-client = "1.8.0"
+
+#candle
+candle-transformers = { git = "https://github.com/huggingface/candle.git", version = "0.4.2" }
+candle-core = { git = "https://github.com/huggingface/candle.git", version = "0.4.2", features = [
+   "cuda",
+] }
+candle-nn = { git = "https://github.com/huggingface/candle.git", version = "0.4.2" }
+
+#hf
+hf-hub = { version = "0.3.2", features = ["tokio"] }
+tokenizers = { version = "0.15.2", features = ["http", "onig"] }
+
+#tracing
+tracing = "0.1.37"
+tracing-chrome = "0.7.1"
+tracing-subscriber = "0.3.7"
+
+#mine
+lib = { path = "./library", package = "library" }
