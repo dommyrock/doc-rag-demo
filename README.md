@@ -23,10 +23,15 @@ cargo run --release -- --prompt 'Write helloworld code in Rust' --sample-len 150
 
 [DistilBert repo](https://github.com/huggingface/candle/tree/b23436bf90b99eb17aed36aaa219875d3c962a7e/candle-examples/examples/distilbert)
 
- 
 [Mistral repo](https://github.com/huggingface/candle/tree/b23436bf90b99eb17aed36aaa219875d3c962a7e/candle-examples/examples/mistral)
 
-### Distilbert HF
+[Quantized repo](https://github.com/huggingface/candle/blob/b23436bf90b99eb17aed36aaa219875d3c962a7e/candle-examples/examples/quantized)
+
+
+#### Quntized mistral HF repo
+[Weights for Quantized mistral](https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/tree/main)
+
+#### Distilbert HF
 
 [Model doc](https://huggingface.co/docs/transformers/model_doc/distilbert)
 
@@ -53,5 +58,3 @@ output = model(**encoded_input)
 ```bash
 C:\Users\dpolzer\.cache\huggingface\hub
 ```
-
-# 
