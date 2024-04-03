@@ -39,9 +39,9 @@ cargo run --release --bin quantized -- --prompt "The best thing about coding in 
 
 **TO Resolve cuda runtime issues** ssee : [Error: Cuda("no cuda implementation for softmax-last-dim")#1330](https://github.com/huggingface/candle/issues/1330)<br>
 
-```toml
+```bash
 #1  Add cuda feature to your candle-transformers dep (same as for the candle-core)
- ... "features = ["cuda"]"
+... "features = ["cuda"]"
  candle-transformers = { git = "https://github.com/huggingface/candle.git", version = "0.4.2", features = ["cuda"] }
 #2 Run model as normal
 cargo run --release --bin quantized -- --cpu --prompt "The best thing about coding in rust is "
@@ -62,7 +62,7 @@ cargo run --release --bin quantized -- --cpu --prompt "The best thing about codi
 ### Conclusion
 > Even **Quantized** models are slow when run on laptop CPU.<br/> ( 365 tokens generated: 1.23 token/s)
 For RAG it seems like running 7B models locally is duable even when quantized.  <br><br>
-> When you elable 'cuda' feature for transformers you get  > 421 tokens generated: 37.81 token/s (quntized model)
+> When you enable 'cuda' feature for transformers you get  > 421 tokens generated: 37.81 token/s (quntized model)
 
 #### Quantization
 >Weight quantization in large language models (LLMs) or any deep learning models refers to the process of reducing the precision of the model's weights from floating-point representation (e.g., 32-bit floating-point numbers) to lower bit-width representations (e.g., 16-bit, 8-bit, or even 1-bit). The primary goal of weight quantization is to reduce the memory footprint and computational requirements of the model, allowing for faster and more efficient inference on devices with limited resources, such as mobile devices or embedded systems.
@@ -72,6 +72,16 @@ Weight quantization typically involves the following steps:
 2. **Quantization error compensation**: This step aims to minimize the loss in accuracy caused by the quantization process. One common approach is to use a technique called "post-training quantization," where the quantized model is fine-tuned to compensate for the quantization error.
 3. **Rounding and clipping**: The quantized weights are rounded to the nearest representable value within the target bit-width, potentially introducing some clipping errors in the process.
 
+#### Simple python code that demonstrats basic RAG flow 
+- [rag-from-the-ground-up-with-python](https://decoder.sh/videos/rag-from-the-ground-up-with-python-and-ollama)
+- [Huggingface rag code exampels](https://huggingface.co/docs/transformers/model_doc/rag)
+
+Good Rag posts<bre>
+- [Efficient Information Retrieval with RAG Workflow](https://medium.com/@akriti.upadhyay/efficient-information-retrieval-with-rag-workflow-afdfc2619171)
+- [RAG chatbot using qdrant + Gemini](https://medium.com/@akriti.upadhyay/building-real-time-financial-news-rag-chatbot-with-gemini-and-qdrant-64c0a3fbe45b)
+- [Implementing RAG w HF + Langchain](https://medium.com/@akriti.upadhyay/implementing-rag-with-langchain-and-hugging-face-28e3ea66c5f7)
+
+---
 #### Distilbert HF
 
 [Model doc](https://huggingface.co/docs/transformers/model_doc/distilbert)
