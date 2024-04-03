@@ -27,16 +27,6 @@ cargo run --release --bin quantized -- --which mixtral --prompt "The best thing 
 cargo run --release -- --prompt 'Write helloworld code in Rust' --sample-len 150
 ```
 
-```bash
-#build for cuda
-cargo build --release --features cuda
-
-#if you dont and try run on cuda build > Error: no cuda implementation for rms-norm
-
-#even if you still build for cuda model might not support running it on cuda and you get the same error.
-cargo run --release --bin quantized -- --prompt "The best thing about coding in rust is "
-```
-
 **TO Resolve cuda runtime issues** ssee : [Error: Cuda("no cuda implementation for softmax-last-dim")#1330](https://github.com/huggingface/candle/issues/1330)<br>
 
 ```bash
