@@ -10,7 +10,7 @@ use tokenizers::Tokenizer;
 
 use candle_core as candle;
 use candle::quantized::{ggml_file, gguf_file};
-use candle::{Device, Tensor};
+use candle::Tensor;
 use candle_transformers::generation::LogitsProcessor;
 
 //use candle_examples::token_output_stream::TokenOutputStream;

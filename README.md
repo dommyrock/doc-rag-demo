@@ -13,6 +13,9 @@ cargo run -- --prompt "Here is a test sentence"
 #run release
 cargo run --release -- --prompt "Here is a test sentence"
 
+#run jina-bert in release
+cargo run --release --bin jina-bert -- --cpu --prompt "The best thing about coding in rust is "
+
 #run quantized models (usually cpu only)
 #by default '7b-mistral-instruct-v0.2' weights get downloaded & loaded
 cargo run --release --bin quantized -- --cpu --prompt "The best thing about coding in rust is "
