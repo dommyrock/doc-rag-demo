@@ -37,6 +37,15 @@ cargo build --release --features cuda
 cargo run --release --bin quantized -- --prompt "The best thing about coding in rust is "
 ```
 
+**TO Resolve cuda runtime issues** ssee : [Error: Cuda("no cuda implementation for softmax-last-dim")#1330](https://github.com/huggingface/candle/issues/1330)<br>
+
+```toml
+#1  Add cuda feature to your candle-transformers dep (same as for the candle-core)
+ ... "features = ["cuda"]"
+ candle-transformers = { git = "https://github.com/huggingface/candle.git", version = "0.4.2", features = ["cuda"] }
+#2 Run model as normal
+cargo run --release --bin quantized -- --cpu --prompt "The best thing about coding in rust is "
+```
 
 ### Higgingface/candle model examples
 
@@ -52,7 +61,8 @@ cargo run --release --bin quantized -- --prompt "The best thing about coding in 
 
 ### Conclusion
 > Even **Quantized** models are slow when run on laptop CPU.<br/> ( 365 tokens generated: 1.23 token/s)
-For RAG it seems like running 7B models locally is duable even when quantized.  
+For RAG it seems like running 7B models locally is duable even when quantized.  <br><br>
+> When you elable 'cuda' feature for transformers you get  > 421 tokens generated: 37.81 token/s (quntized model)
 
 #### Quantization
 >Weight quantization in large language models (LLMs) or any deep learning models refers to the process of reducing the precision of the model's weights from floating-point representation (e.g., 32-bit floating-point numbers) to lower bit-width representations (e.g., 16-bit, 8-bit, or even 1-bit). The primary goal of weight quantization is to reduce the memory footprint and computational requirements of the model, allowing for faster and more efficient inference on devices with limited resources, such as mobile devices or embedded systems.
