@@ -27,14 +27,14 @@ cargo run --release --bin quantized -- --which mixtral --prompt "The best thing 
 cargo run --release -- --prompt 'Write helloworld code in Rust' --sample-len 150
 ```
 
-**TO Resolve cuda runtime issues** ssee : [Error: Cuda("no cuda implementation for softmax-last-dim")#1330](https://github.com/huggingface/candle/issues/1330)<br>
+**TO Resolve cuda runtime issues** see : [Error: Cuda("no cuda implementation for softmax-last-dim")#1330](https://github.com/huggingface/candle/issues/1330)<br>
 
 ```bash
 #1  Add cuda feature to your candle-transformers dep (same as for the candle-core)
 ... "features = ["cuda"]"
  candle-transformers = { git = "https://github.com/huggingface/candle.git", version = "0.4.2", features = ["cuda"] }
 #2 Run model as normal
-cargo run --release --bin quantized -- --cpu --prompt "The best thing about coding in rust is "
+cargo run --release --bin quantized -- --prompt "The best thing about coding in rust is "
 ```
 
 ### Higgingface/candle model examples
