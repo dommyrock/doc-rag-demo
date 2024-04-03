@@ -1748,9 +1748,11 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "candle-core",
+ "candle-kernels",
  "candle-nn",
  "candle-transformers",
  "clap",
+ "cudarc",
  "env_logger",
  "hf-hub",
  "library",

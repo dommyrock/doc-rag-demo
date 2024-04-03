@@ -26,6 +26,8 @@ candle-core = { git = "https://github.com/huggingface/candle.git", version = "0.
    "cuda",
 ] }
 candle-nn = { git = "https://github.com/huggingface/candle.git", version = "0.4.2" }
+candle-kernels = { git = "https://github.com/huggingface/candle.git", version = "0.4.2" }
+cudarc = { version = "0.10.0", features = ["f16"] }
 
 #hf
 hf-hub = { version = "0.3.2", features = ["tokio"] }

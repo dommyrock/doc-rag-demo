@@ -21,6 +21,7 @@ rand = { workspace = true, optional = true }
 candle-transformers = { workspace = true }
 candle-core = { workspace = true }
 candle-nn = { workspace = true }
+candle-kernels = { workspace = true, optional = true }
 
 #hf
 hf-hub = { workspace = true }
@@ -32,5 +33,12 @@ tracing-chrome = { workspace = true }
 tracing-subscriber = { workspace = true }
 
 lib = { workspace = true }
+cudarc = { workspace = true, optional = true }
 
-
+[features]
+default = []
+cuda = ["cudarc", "dep:candle-kernels"]
+cudnn = ["cuda", "cudarc/cudnn"]
+# mkl = ["dep:libc", "dep:intel-mkl-src"]
+# accelerate = ["dep:libc", "dep:accelerate-src"]
+# metal = ["dep:metal", "dep:candle-metal-kernels"]
