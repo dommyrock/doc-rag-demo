@@ -1,5 +1,5 @@
 [package]
-name = "rag"
+name = "quantized"
 version.workspace = true
 edition.workspace = true
 description.workspace = true
