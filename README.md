@@ -13,7 +13,7 @@ cargo run -- --prompt "Here is a test sentence"
 #run release
 cargo run --release -- --prompt "Here is a test sentence"
 
-#run jina-bert in release
+#run jina-bert in release (gpu not supported > no cuda implementation for softmax-last-dim)
 cargo run --release --bin jina-bert -- --cpu --prompt "The best thing about coding in rust is "
 
 #run quantized models (usually cpu only)
