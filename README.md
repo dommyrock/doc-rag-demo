@@ -104,6 +104,9 @@ model.to(device)
 
 output = model(**encoded_input)
 ```
+### RAG pipeline (high lvl overview)
+![image (1)](https://github.com/dommyrock/doc-rag-demo/assets/32032778/9b134e26-0d5c-46b8-afb4-00aa2148e6e7)
+
 
 ### Windows download directory for weights/safetensors 
 ```bash
