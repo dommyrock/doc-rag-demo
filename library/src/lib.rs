@@ -74,7 +74,7 @@ pub fn split_into_chunks(pth: &str) -> Vec<String> {
 pub async fn insert_many(
     collection_name: &str,
     vectors: Vec<Vec<f32>>,
-    client: qdrant_client::client::QdrantClient,
+    client: &qdrant_client::client::QdrantClient,
 ) -> anyhow::Result<()> {
     let points_result: anyhow::Result<Vec<PointStruct>> = vectors
         .into_iter()

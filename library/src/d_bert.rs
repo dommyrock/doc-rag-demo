@@ -129,7 +129,7 @@ fn get_mask(size: usize, device: &Device) -> Tensor {
 pub fn get_prompt_embeddings(
     bert_model: &DistilBertModel,
     tokenizer: &mut Tokenizer,
-    args: Args,
+    args: &Args,
 ) -> Result<Tensor, E> {
     let device = &bert_model.device;
 
@@ -139,7 +139,7 @@ pub fn get_prompt_embeddings(
         .map_err(E::msg)?;
 
     let tokens = tokenizer
-        .encode(args.prompt, true)
+        .encode(args.prompt.clone(), true)
         .map_err(E::msg)?
         .get_ids()
         .to_vec();
