@@ -1,5 +1,5 @@
 [workspace]
-members = ["d-bert", "mistral", "jina-bert", "library", "quantized"]
+members = ["d-bert", "mistral", "jina-bert", "library", "quantized", "rag"]
 resolver = "2"
 
 [workspace.package]
@@ -19,6 +19,7 @@ env_logger = "0.10.0"
 rand = "0.8.5"
 clap = "4.5.4"
 qdrant-client = "1.8.0"
+rayon = "1.8.0"
 
 #candle
 candle-transformers = { git = "https://github.com/huggingface/candle.git", version = "0.4.2", features = [

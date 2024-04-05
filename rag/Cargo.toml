@@ -1,5 +1,5 @@
 [package]
-name = "library"
+name = "rag"
 version.workspace = true
 edition.workspace = true
 description.workspace = true
@@ -13,10 +13,10 @@ anyhow = { workspace = true }
 serde_json = { workspace = true }
 clap = { workspace = true }
 qdrant-client = { workspace = true }
-rayon = { workspace = true}
-tokio = { workspace = true, optional = true }
+tokio = { workspace = true}
 env_logger = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
+
 #candle
 candle-transformers = { workspace = true }
 candle-core = { workspace = true }
@@ -32,6 +32,7 @@ tracing = { workspace = true }
 tracing-chrome = { workspace = true }
 tracing-subscriber = { workspace = true }
 
+lib = { workspace = true }
 cudarc = { workspace = true, optional = true }
 
 [features]

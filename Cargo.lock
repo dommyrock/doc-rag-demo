@@ -1290,12 +1290,24 @@ checksum = "4ec2a862134d2a7d32d7983ddcdd1c4923530833c9f2ea1a44fc5fa473989058"
 name = "library"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "candle-core",
+ "candle-kernels",
  "candle-nn",
  "candle-transformers",
+ "clap",
+ "cudarc",
+ "env_logger",
  "hf-hub",
+ "qdrant-client",
+ "rand",
+ "rayon",
  "serde_json",
  "tokenizers",
+ "tokio",
+ "tracing",
+ "tracing-chrome",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -1795,6 +1807,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "291ec9ab5efd934aaf503a6466c5d5251535d108ee747472c3977cc5acc868ef"
 dependencies = [
  "proc-macro2",
+]
+
+[[package]]
+name = "rag"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "candle-core",
+ "candle-kernels",
+ "candle-nn",
+ "candle-transformers",
+ "clap",
+ "cudarc",
+ "env_logger",
+ "hf-hub",
+ "library",
+ "qdrant-client",
+ "rand",
+ "serde_json",
+ "tokenizers",
+ "tokio",
+ "tracing",
+ "tracing-chrome",
+ "tracing-subscriber",
 ]
 
 [[package]]
