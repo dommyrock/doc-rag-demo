@@ -13,7 +13,7 @@ use candle_transformers::models::distilbert::{Config, DistilBertModel};
 use clap::Parser;
 use hf_hub::{api::sync::Api, Repo, RepoType};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use tokenizers::Tokenizer;
+use tokenizers::{PaddingParams, PaddingStrategy, Tokenizer};
 
 use crate::device;
 
@@ -128,7 +128,7 @@ fn get_mask(size: usize, device: &Device) -> Tensor {
 /// ````
 pub fn get_prompt_embeddings(
     bert_model: &DistilBertModel,
-    tokenizer: &mut Tokenizer,
+    mut tokenizer: Tokenizer,
     args: &Args,
 ) -> Result<Tensor, E> {
     let device = &bert_model.device;
@@ -156,17 +156,54 @@ pub fn get_prompt_embeddings(
 
     Ok(embeddings)
 }
+pub fn generate_embedding(
+    bert_model: &DistilBertModel,
+    tokenizer: &Tokenizer,
+    args: &Args,
+) -> Result<Tensor, E> {
+    let device = &bert_model.device;
+
+    let tokens = tokenizer
+        .encode(args.prompt.clone(), true)
+        .map_err(E::msg)?
+        .get_ids()
+        .to_vec();
+
+    let token_ids = Tensor::new(&tokens[..], device)?.unsqueeze(0)?;
+    println!("token_ids shape: {:?}", token_ids.shape());
+    let token_type_ids = token_ids.zeros_like()?;
+    println!("running inference {:?}", token_ids.shape());
+    let start = std::time::Instant::now();
+    let embedding = bert_model.forward(&token_ids, &token_type_ids)?;
+    println!("embedding shape: {:?}", embedding.shape());
+    println!("Embedding took {:?} to generate", start.elapsed());
+    Ok(embedding)
+}
 
 fn normalize_l2(v: &Tensor) -> Result<Tensor> {
     Ok(v.broadcast_div(&v.sqr()?.sum_keepdim(1)?.sqrt()?)?)
 }
 
 pub async fn generate_embeddings(
-    doc_chunks: Vec<String>,
-    bert_model: DistilBertModel,
-    tokenizer: Tokenizer,
-) -> Result<Tensor, E> {
+    txt: String,
+    bert_model: &DistilBertModel,
+    tokenizer: &mut Tokenizer,
+) -> Result<(Tensor,Vec<String>), E> {
     let device = &bert_model.device;
+    let doc_chunks = split_text_into_chunks(300, 80, &txt);
+
+    //println!("Doc chunks:\n {:?}",doc_chunks);
+
+    //Add padding
+    if let Some(pp) = tokenizer.get_padding_mut() {
+        pp.strategy = tokenizers::PaddingStrategy::BatchLongest
+    } else {
+        let pp = PaddingParams {
+            strategy: PaddingStrategy::BatchLongest,
+            ..Default::default()
+        };
+        tokenizer.with_padding(Some(pp));
+    }
 
     //Encode all the sentences in parallel
     let tokens = tokenizer
@@ -185,8 +222,7 @@ pub async fn generate_embeddings(
             Ok((i, tensor))
         })
         .collect::<Result<Vec<_>>>()?;
-    //TODO: For each Tensor i need to append special tokens + padding if len() < [some len < 512 = bert ctx limit]
-    
+
     let embeddings = vec![Tensor::ones((2, 3), candle_core::DType::F32, device)?; token_ids.len()];
 
     // Wrap the embeddings vector in an Arc<Mutex<_>> for thread-safe access
@@ -210,6 +246,7 @@ pub async fn generate_embeddings(
             Ok::<(), anyhow::Error>(())
         },
     )?;
+
     println!("Done computing embeddings");
     println!("Embeddings took {:?} to generate", start.elapsed());
 
@@ -219,57 +256,34 @@ pub async fn generate_embeddings(
         .into_inner()
         .map_err(|e| anyhow!("Mutex error: {}", e))?;
 
-    //ERROR: shape mismatch in cat for dim 1, shape for arg 1: [1, 84, 768] shape for arg 2: [1, 100, 768]
     //SEE Chunking section  : https://www.mim.ai/fine-tuning-bert-model-for-arbitrarily-long-texts-part-1/
 
-    //conclusion: padding was missing here
+    println!(
+        "Embeddings: \n\n {:?} \n DIMS {:?}",
+        embeddings_arc,
+        embeddings_arc[0].dims()
+    );
 
     let stacked_embeddings = Tensor::stack(&embeddings_arc, 0)?;
-
-    println!("Stacked -----> embeddings");
-
-    Ok(stacked_embeddings)
+    Ok((stacked_embeddings,doc_chunks))
 }
 
-pub async fn generate_embeddings_v3(
-    text: String,
-    bert_model: DistilBertModel,
-    mut tokenizer: Tokenizer,
-) -> Result<Tensor, E> {
-    let device = &bert_model.device;
+pub fn split_text_into_chunks(chunk_size: usize, overlap: usize, txt: &str) -> Vec<String> {
+    let words: Vec<&str> = txt.split_whitespace().collect();
+    let mut chunks: Vec<String> = vec![];
 
-    // Set padding strategy
-    let pp = tokenizers::PaddingParams {
-        strategy: tokenizers::PaddingStrategy::BatchLongest,
-        ..Default::default()
-    };
-    tokenizer.with_padding(Some(pp));
-
-    // Encode the text
-    let tokens = tokenizer
-        .encode(text, true)
-        .map_err(E::msg)?
-        .get_ids()
-        .to_vec();
-    let token_ids = Tensor::new(&tokens[..], device)?.unsqueeze(0)?;
-
-    // Use the chunk_with_overlap function to get chunks
-    let chunks = chunk_with_overlap(&token_ids, 510, 100, device)?;
-
-    // Parallelize the chunks into Vec<Embeddings>
-    let embeddings: Result<Vec<Tensor>> = chunks
-        .par_iter()
-        .map(|(token_ids, mask)| {
-            let embeddings = bert_model.forward(token_ids, mask)?;
-            let normalized_embeddings = normalize_l2(&embeddings)?;
-            Ok(normalized_embeddings)
-        })
-        .collect();
-
-    let embeddings = embeddings.expect("Should contain embeddings for document chunks.");
-    let stacked_embeddings = Tensor::stack(&embeddings, 0)?;
-
-    Ok(stacked_embeddings)
+    let mut i = 0;
+    while i < words.len() {
+        let end = usize::min(i + chunk_size, words.len());
+        let chunk: Vec<&str> = words[i..end].to_vec();
+        chunks.push(chunk.join(" "));
+        i = if end < words.len() {
+            end - overlap
+        } else {
+            end
+        };
+    }
+    chunks
 }
 
 ///Custom implementation (didn't quite work, since i ended up with 4dim , but Qdrant Expected 2 when inserting :/ )
@@ -277,7 +291,7 @@ pub async fn tokenize_chunks_get_embeddings(
     text: String,
     bert_model: DistilBertModel,
     tokenizer: &mut Tokenizer,
-) -> Result<Tensor, E> {
+) -> Result<Vec<Tensor>> {
     let device = &bert_model.device;
 
     let tokenizer = tokenizer
@@ -299,25 +313,41 @@ pub async fn tokenize_chunks_get_embeddings(
     let embeddings: Result<Vec<Tensor>> = chunks
         .par_iter()
         .map(|(token_ids, mask)| {
-            let embeddings = bert_model.forward(token_ids, mask)?;
+            let embeddings = bert_model.forward(token_ids, mask)?.squeeze(0)?;
             let normalized_embeddings = normalize_l2(&embeddings)?;
+            //println!("Bart Embedding shape: {:?}", normalized_embeddings.shape());
             Ok(normalized_embeddings)
         })
         .collect();
 
-    // for (t, mask) in chunks {
-    //     let t_len: usize = t.dims().iter().product();
-    //     let mask_l: usize = mask.dims().iter().product();
-    //     println!("Tensor  len : [{t_len}]   - mask len[{mask_l}]");
-    //     println!("{t}");
-    //     println!("{mask}");
-    // }
+    for (t, mask) in chunks {
+        let t_len: usize = t.dims().iter().product();
+        let mask_l: usize = mask.dims().iter().product();
+        println!("Tensor  len : [{t_len}]   - mask len[{mask_l}]");
+        println!("{t}");
+        println!("{mask}");
+        println!("Shape: {:?}\n", t.shape());
+    }
 
+    println!("Embeddings: \n\n{:?} \n", embeddings);
+
+    //SHAPE
+    //[1, 512, 768], this means that each chunk of 512 tokens is represented by a 768-dimensional embedding.
     let embeddings = embeddings.expect("Should conatain embeddings for document chunks.");
-    let stacked_embeddings = Tensor::stack(&embeddings, 0)?;
+    // let stacked_embeddings = Tensor::stack(&embeddings, 0)?;
 
-    Ok(stacked_embeddings)
+    //Stacked SHAPE
+    //[9, 1, 512, 768], this means that each chunk of 512 tokens is represented by a 768-dimensional embedding.
+    // Ok(stacked_embeddings)
+
+    Ok(embeddings)
 }
+
+//The recommended order of operations is:
+//
+//1. Tokenize the input sequence.
+//2. Add the special tokens (e.g. "CLS" at the beginning and "SEP" at the end).
+//3. Pad the resulting sequence to the desired length.
 
 fn chunk_with_overlap(
     tensor: &Tensor,
@@ -345,7 +375,7 @@ fn chunk_with_overlap(
             mask = mask.pad_with_zeros(D::Minus1, 0, padding)?;
 
             chunks.push((cat, mask));
-            
+
             start += chunk_size - overlap;
         }
     }
@@ -356,3 +386,40 @@ fn get_ones_mask(size: usize, device: &Device) -> Result<Tensor, candle_core::Er
     let mask = Tensor::ones(&[1, size], candle_core::DType::U8, device);
     mask
 }
+
+/*Example special token config
+
+    let sep = tokenizer.get_model().token_to_id("[SEP]").unwrap();//[101]
+    let cls = tokenizer.get_model().token_to_id("[CLS]").unwrap();//[102]
+
+    let tokenizer = tokenizer
+        .with_padding(None)
+        .with_normalizer(BertNormalizer::default())
+        .with_post_processor(BertProcessing::new(
+            (String::from("SEP"), sep),
+            (String::from("CLS"), cls),
+        ))
+        .with_truncation(None)
+        .map_err(E::msg)?;
+
+// Set padding strategy example
+    let pp = tokenizers::PaddingParams {
+        strategy: tokenizers::PaddingStrategy::BatchLongest,
+        ..Default::default()
+    };
+    tokenizer.with_padding(Some(pp));
+
+//There is also special tokes api
+//https://github.com/huggingface/tokenizers/blob/main/tokenizers/tests/common/mod.rs#L41
+*/
+
+/* Dimensionality
+* OpenAI's embeddings have higher dimensionality (1536) compared to DistilBERT (768)
+
+"distilbert-base-uncased" is a distilled version of the BERT model, which produces embeddings of size 768 for each token in the input sequence. So, for a 512-token chunk of text, the output embeddings would have a shape of `[512, 768]` (assuming you're using the last-layer hidden states as the embeddings).
+
+On the other hand, OpenAI's embeddings model (`text-embedding-ada-002`) produces embeddings of size 1536 for each input token. So, for a 512-token chunk of text, the output embeddings would have a shape of `[512, 1536]`.
+
+
+In the context of retrieval-augmented generation, using the last-layer hidden states as the embeddings is a common choice, as it provides a compact and informative representation of the input text that can be used to find similar documents or sentences. However, you could also experiment with using earlier layers or a combination of layers to see if that works better for your use case.
+*/

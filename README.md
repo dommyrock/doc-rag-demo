@@ -118,3 +118,17 @@ Yor matrice dimensions won't match and when you try to stack them you'll get sim
     let stacked_embeddings = Tensor::stack(&embeddings_arc, 0)?;
 ```
 
+- ERRORS thrown from **Qdrant** are usually because it expects one dimensional Tensor <br>
+For example document chunk embeddings shape should look like<br>
+> Tensor SHAPE/Dims: [12, 768]  
+--> 12 chunks /embeddings of 768 dimensions (generated from 
+distil bert model) <br>
+
+> Prompt Shape/Dims: [768] --> (generated from distil bert model)
+
+```rust
+//you can either call .squeeze(0)?; //to get rid of unwanted dimension
+
+//or get rid of multiple unwanted dimensions and only keep relevant embeddings in the Tensor 
+.mean((0, 1))?; //was [1,9,768] -? keep 768
+```

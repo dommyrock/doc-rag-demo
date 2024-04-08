@@ -3,7 +3,10 @@ use std::{collections::HashMap, fmt::Debug};
 use anyhow::Result;
 use clap::Parser;
 use lib::{
-    d_bert::{generate_embeddings, generate_embeddings_v3, get_prompt_embeddings, tokenize_chunks_get_embeddings, Args},
+    d_bert::{
+        generate_embedding, generate_embeddings, get_prompt_embeddings,
+        tokenize_chunks_get_embeddings, Args,
+    },
     insert_many,
 };
 pub use qdrant_client::prelude::Value as QdrantValue;
@@ -55,24 +58,25 @@ async fn main() -> Result<()> {
         .collect::<Vec<_>>()
         .join("\n");
 
-    // let collection = std::path::Path::new(&args.file)
-    //     .file_stem()
-    //     .and_then(|name| name.to_str())
-    //     .ok_or_else(|| anyhow::anyhow!("Failed to extract file stem"))?
-    //     .to_string();
-    const COLLECTION_NAME: &'static str = "Rag-demo";
+    let source_file = std::path::Path::new(&args.file)
+        .file_stem()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| anyhow::anyhow!("Failed to extract file stem"))?
+        .to_string();
+
+    const COLLECTION_NAME: &'static str = "Rag-demo60";
 
     let client = QdrantClient::from_url("http://localhost:6334").build()?;
-    let _=client.delete_collection(COLLECTION_NAME);
+    let _ = client.delete_collection(COLLECTION_NAME);
     client
         .create_collection(&CreateCollection {
             collection_name: COLLECTION_NAME.into(),
             vectors_config: Some(VectorsConfig {
                 config: Some(qdrant_client::qdrant::vectors_config::Config::Params(
                     VectorParams {
-                        size: 512,
+                        size: 768, //512 x 768 (chunk x bert_forward) //qdrant limit =  393216 invalid, must be from 1.0 to 65536.0
                         distance: Distance::Cosine.into(),
-                        
+
                         ..Default::default()
                     },
                 )),
@@ -85,27 +89,37 @@ async fn main() -> Result<()> {
     dbg!(coll);
 
     let (model, mut tokenizer) = args.build_model_and_tokenizer()?;
-    let prompt_embedding = get_prompt_embeddings(&model, &mut tokenizer, &args)?;
-    //println!("p embed\n: {prompt_embedding}");
-
-    //v2  Generate embeddings for the document chunks
-    //let embeddings = tokenize_chunks_get_embeddings(text, model, &mut tokenizer).await?;
-    
-    //v3
-    let embeddings = generate_embeddings_v3(text, model, tokenizer).await?;
-
     //v1
-    //let embeddings = generate_embeddings(chunks, model, tokenizer).await?;
+    let (e, chunks) = generate_embeddings(text, &model, &mut tokenizer).await?;
 
-    println!("generated embeddings {:?}", embeddings.shape());
+    let embeddings = e.mean(1)?;
+    //V1 Tensor SHAPE [12, 433, 768]
 
-    // Store generated embeddings
-    insert_many(&COLLECTION_NAME, embeddings.to_vec2()?, &client).await?;
+    //v2  Generate embeddings for the document chunks (also needs mean removal to keep only last dimension from bert = 768)
+    // let embeddings: Vec<candle_core::Tensor> =
+    //     tokenize_chunks_get_embeddings(text, model, &mut tokenizer).await?;
+
+    println!("Tensor SHAPE {:?}", embeddings.shape());
+    println!("Tensor Dimensions {:?}", embeddings.dims());
+
+    //Vector store
+    insert_many(
+        &COLLECTION_NAME,
+        embeddings.to_vec2()?,
+        &client,
+        chunks,
+        &source_file,
+    )
+    .await?;
+
+    // let prompt_embedding = get_prompt_embeddings(&model, tokenizer, &args)?;
+    let prompt_embedding = generate_embedding(&model, &tokenizer, &args)?.mean((0, 1))?; //was [1,9,768] -? keep 768
 
     //search qdrant for similarities
-    println!("Constructing Search request ...........");
+    println!("Prompt shape: {:?}", prompt_embedding.shape());
+    println!("Prompt DIMS: {:?}", prompt_embedding.dims());
 
-    let limit: u64 = 4;
+    let limit: u64 = 2;
     let search_request = SearchPoints {
         collection_name: COLLECTION_NAME.into(),
         vector: prompt_embedding.to_vec1::<f32>()?,
@@ -115,11 +129,9 @@ async fn main() -> Result<()> {
         ..Default::default()
     };
 
+    println!("[Qdrant] search response:");
     let response = client.search_points(&search_request).await?;
-
-    println!("Qdrant query response ln 102: {:?}", response);
-
-    // dbg!(&response);
+    dbg!(&response);
 
     // let result: Vec<FoundPoint> = response
     //     .result
@@ -233,10 +245,12 @@ async fn main() -> Result<()> {
 
     Ok(())
 }
+
 //tokio streaming response example
 //https://www.shuttle.rs/blog/2024/02/28/rag-llm-rust (above wrapping it all up... section)
 
 //cd rag
+//cargo run --bin rag -- --prompt "tell me something about GPU pipeline" --file gpu_pipeline_1.txt
 //cargo run --release --bin rag -- --prompt "tell me something about GPU pipeline" --file gpu_pipeline_1.txt
 
 // QDRANT CMD's
