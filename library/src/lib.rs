@@ -60,7 +60,11 @@ pub fn split_into_chunks(pth: &str) -> Vec<String> {
     let chunk_size = 400;
     let overlap = 80;
 
-    let text = std::fs::read_to_string(std::path::Path::new(&pth)).unwrap();
+    let text = std::fs::read_to_string(std::path::Path::new(&pth)).unwrap()
+    .lines()
+    .filter(|&ln| ln.is_empty())
+    .collect::<Vec<_>>()
+    .join("\n");
 
     text.chars()
         .collect::<Vec<char>>()

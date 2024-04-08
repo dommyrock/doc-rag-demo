@@ -6,7 +6,7 @@ extern crate accelerate_src;
 use std::sync::{Arc, Mutex};
 
 use anyhow::{anyhow, Error as E, Result};
-use candle_core::{Device, Tensor};
+use candle_core::{Device, Tensor, D};
 use candle_nn::VarBuilder;
 use candle_transformers::models::distilbert::DTYPE;
 use candle_transformers::models::distilbert::{Config, DistilBertModel};
@@ -148,7 +148,6 @@ pub fn get_prompt_embeddings(
     let mask = get_mask(tokens.len(), device);
 
     let embeddings = bert_model.forward(&token_ids, &mask)?;
-
     let embeddings = if args.normalize_embeddings {
         normalize_l2(&embeddings)?
     } else {
@@ -186,6 +185,8 @@ pub async fn generate_embeddings(
             Ok((i, tensor))
         })
         .collect::<Result<Vec<_>>>()?;
+    //TODO: For each Tensor i need to append special tokens + padding if len() < [some len < 512 = bert ctx limit]
+    
     let embeddings = vec![Tensor::ones((2, 3), candle_core::DType::F32, device)?; token_ids.len()];
 
     // Wrap the embeddings vector in an Arc<Mutex<_>> for thread-safe access
@@ -218,7 +219,140 @@ pub async fn generate_embeddings(
         .into_inner()
         .map_err(|e| anyhow!("Mutex error: {}", e))?;
 
+    //ERROR: shape mismatch in cat for dim 1, shape for arg 1: [1, 84, 768] shape for arg 2: [1, 100, 768]
+    //SEE Chunking section  : https://www.mim.ai/fine-tuning-bert-model-for-arbitrarily-long-texts-part-1/
+
+    //conclusion: padding was missing here
+
     let stacked_embeddings = Tensor::stack(&embeddings_arc, 0)?;
 
+    println!("Stacked -----> embeddings");
+
     Ok(stacked_embeddings)
+}
+
+pub async fn generate_embeddings_v3(
+    text: String,
+    bert_model: DistilBertModel,
+    mut tokenizer: Tokenizer,
+) -> Result<Tensor, E> {
+    let device = &bert_model.device;
+
+    // Set padding strategy
+    let pp = tokenizers::PaddingParams {
+        strategy: tokenizers::PaddingStrategy::BatchLongest,
+        ..Default::default()
+    };
+    tokenizer.with_padding(Some(pp));
+
+    // Encode the text
+    let tokens = tokenizer
+        .encode(text, true)
+        .map_err(E::msg)?
+        .get_ids()
+        .to_vec();
+    let token_ids = Tensor::new(&tokens[..], device)?.unsqueeze(0)?;
+
+    // Use the chunk_with_overlap function to get chunks
+    let chunks = chunk_with_overlap(&token_ids, 510, 100, device)?;
+
+    // Parallelize the chunks into Vec<Embeddings>
+    let embeddings: Result<Vec<Tensor>> = chunks
+        .par_iter()
+        .map(|(token_ids, mask)| {
+            let embeddings = bert_model.forward(token_ids, mask)?;
+            let normalized_embeddings = normalize_l2(&embeddings)?;
+            Ok(normalized_embeddings)
+        })
+        .collect();
+
+    let embeddings = embeddings.expect("Should contain embeddings for document chunks.");
+    let stacked_embeddings = Tensor::stack(&embeddings, 0)?;
+
+    Ok(stacked_embeddings)
+}
+
+///Custom implementation (didn't quite work, since i ended up with 4dim , but Qdrant Expected 2 when inserting :/ )
+pub async fn tokenize_chunks_get_embeddings(
+    text: String,
+    bert_model: DistilBertModel,
+    tokenizer: &mut Tokenizer,
+) -> Result<Tensor, E> {
+    let device = &bert_model.device;
+
+    let tokenizer = tokenizer
+        .with_padding(None)
+        .with_truncation(None)
+        .map_err(E::msg)?;
+
+    let tokens = tokenizer
+        .encode(text, true)
+        .map_err(E::msg)?
+        .get_ids()
+        .to_vec();
+
+    let token_ids = Tensor::new(&tokens[..], device)?.unsqueeze(0)?;
+
+    let chunks = chunk_with_overlap(&token_ids, 510, 100, device)?;
+
+    // Parallelize the chunks into Vec<Embeddings>
+    let embeddings: Result<Vec<Tensor>> = chunks
+        .par_iter()
+        .map(|(token_ids, mask)| {
+            let embeddings = bert_model.forward(token_ids, mask)?;
+            let normalized_embeddings = normalize_l2(&embeddings)?;
+            Ok(normalized_embeddings)
+        })
+        .collect();
+
+    // for (t, mask) in chunks {
+    //     let t_len: usize = t.dims().iter().product();
+    //     let mask_l: usize = mask.dims().iter().product();
+    //     println!("Tensor  len : [{t_len}]   - mask len[{mask_l}]");
+    //     println!("{t}");
+    //     println!("{mask}");
+    // }
+
+    let embeddings = embeddings.expect("Should conatain embeddings for document chunks.");
+    let stacked_embeddings = Tensor::stack(&embeddings, 0)?;
+
+    Ok(stacked_embeddings)
+}
+
+fn chunk_with_overlap(
+    tensor: &Tensor,
+    chunk_size: usize,
+    overlap: usize,
+    device: &Device,
+) -> Result<Vec<(Tensor, Tensor)>, candle_core::Error> {
+    let total_elements: usize = tensor.dims().iter().product();
+    let mut start = 0;
+    let mut chunks: Vec<(Tensor, Tensor)> = Vec::new();
+
+    while start < total_elements {
+        let end = std::cmp::min(start + chunk_size, total_elements);
+        if let Ok(chunk) = tensor.narrow(D::Minus1, start, end - start) {
+            //special start /end tokens
+            let st_start = Tensor::new([101 as u32].as_slice(), device)?.unsqueeze(0)?;
+            let st_end = Tensor::new([102 as u32].as_slice(), device)?.unsqueeze(0)?;
+            let mut cat = Tensor::cat(&[st_start, chunk, st_end], D::Minus1)?;
+            let mut mask = get_ones_mask(cat.dims().iter().product(), device)?;
+
+            //Add padding where len < 512
+            let padding = 512 - cat.dims().iter().product::<usize>();
+
+            cat = cat.pad_with_zeros(D::Minus1, 0, padding)?;
+            mask = mask.pad_with_zeros(D::Minus1, 0, padding)?;
+
+            chunks.push((cat, mask));
+            
+            start += chunk_size - overlap;
+        }
+    }
+    Ok(chunks)
+}
+
+fn get_ones_mask(size: usize, device: &Device) -> Result<Tensor, candle_core::Error> {
+    let mask = Tensor::ones(&[1, size], candle_core::DType::U8, device);
+    mask
 }

@@ -102,3 +102,19 @@ output = model(**encoded_input)
 ```bash
 C:\Users\dpolzer\.cache\huggingface\hub
 ```
+
+<br/>
+<br/>
+<br/>
+
+### Errors 
+
+- Non matching file chunk dimensions .
+If you make a mistake while splitting tokenized chunks from document to non equal (non padded) equal len.<br>
+Yor matrice dimensions won't match and when you try to stack them you'll get similar error.
+
+**ERROR: shape mismatch in cat for dim 1, shape for arg 1: [1, 84, 768] shape for arg 2: [1, 100, 768]**
+```bash
+    let stacked_embeddings = Tensor::stack(&embeddings_arc, 0)?;
+```
+
