@@ -64,7 +64,7 @@ async fn main() -> Result<()> {
         .ok_or_else(|| anyhow::anyhow!("Failed to extract file stem"))?
         .to_string();
 
-    const COLLECTION_NAME: &'static str = "Rag-demo70";
+    const COLLECTION_NAME: &'static str = "Rag-demo73";
 
     let client = QdrantClient::from_url("http://localhost:6334").build()?;
     let _ = client.delete_collection(COLLECTION_NAME);
@@ -130,7 +130,6 @@ async fn main() -> Result<()> {
     };
 
     let response = client.search_points(&search_request).await?;
-    // dbg!(&response);
 
     println!("[Qdrant] pretty response:");
     let result: Vec<FoundPoint> = response
@@ -228,17 +227,23 @@ async fn main() -> Result<()> {
         HeaderValue::from_str(&format!("Bearer {}", api_key))?,
     );
 
-    // //TODO : UPDATE 'GDRANT RESPONSES' with the Vec<Qdrant relevant top N responses>
     let mut body: serde_json::Value = json!({
         "messages": [{"role":"system","content":"You are a highly advanced assistant. You receive a prompt from a user and relevant excerpts extracted from a text document. You then answer truthfully to the best of your ability. If you do not know the answer, your response is I don't know."},
         {"role": "user", "content": &args.prompt},
         {"role":"system","content":"Based on the retrieved information from the document, here are the relevant excerpts:{{payload}}Please provide a comprehensive answer to the user's question, integrating insights from these excerpts and your general knowledge."}],
-        "model": "mixtral-8x7b-32768"
+        "model": "mixtral-8x7b-32768",
+        "temperature": 0.8,
+        "max_tokens": 1024,
+        "top_p": 1,
+        "stop": null,
+        "stream": false
     });
 
-    // // Update the content field in the second message
+    // Update Prompt template
     if let serde_json::Value::Array(ref mut messages) = body["messages"] {
         if let serde_json::Value::String(ref mut content) = messages[2]["content"] {
+            
+            //Strip Qdrant Type wrappers
             let payloads = result
                 .iter()
                 .filter_map(|r| r.payload.as_ref().and_then(|val| val.get("txt_chunk")))
@@ -257,6 +262,8 @@ async fn main() -> Result<()> {
             content.replace_range(start..end, &joined_payloads)
         }
     }
+    //final body
+    println!("Qdrant chunks:\n{}", serde_json::to_string_pretty(&body).unwrap());
 
     match client
         .post("https://api.groq.com/openai/v1/chat/completions")
@@ -266,55 +273,21 @@ async fn main() -> Result<()> {
         .await
     {
         Ok(res) => {
-            //Got the response
-            println!("GROQ:\n");
-            dbg!(res);
+            let json: serde_json::Value = serde_json::from_str(&res.text().await?)?;
+            if let Some(choices) = json["choices"].as_array() {
+                for choice in choices {
+                    if let Some(message) = choice["message"].as_object() {
+                        if let Some(content) = message["content"].as_str() {
+                            println!("GROQ: \n{}", content);
+                        }
+                    }
+                }
+            }
         }
         Err(er) => {
             eprintln!("Error while Requesting GROQ API:\n {er}")
         }
     }
-
-    /* groq response dbg()
-[rag\src\main.rs:271:13] res = Response {
-    url: Url {
-        scheme: "https",
-        cannot_be_a_base: false,
-        username: "",
-        password: None,
-        host: Some(
-            Domain(
-                "api.groq.com",
-            ),
-        ),
-        port: None,
-        path: "/openai/v1/chat/completions",
-        query: None,
-        fragment: None,
-    },
-    status: 200,
-    headers: {
-        "date": "Tue, 09 Apr 2024 13:48:24 GMT",
-        "content-type": "application/json; charset=UTF-8",
-        "transfer-encoding": "chunked",
-        "connection": "keep-alive",
-        "cache-control": "private, max-age=0, no-store, no-cache, must-revalidate",
-        "vary": "Origin, Accept-Encoding",
-        "x-ratelimit-limit-requests": "14400",
-        "x-ratelimit-limit-tokens": "18000",
-        "x-ratelimit-remaining-requests": "14399",
-        "x-ratelimit-remaining-tokens": "16546",
-        "x-ratelimit-reset-requests": "6s",
-        "x-ratelimit-reset-tokens": "4.846666666s",
-        "x-request-id": "req_01hv1hvvxkeyqb2wak3wxr08ag",
-        "via": "1.1 google",
-        "alt-svc": "h3=\":443\"; ma=86400",
-        "cf-cache-status": "DYNAMIC",
-        "server": "cloudflare",
-        "cf-ray": "871af450be525b12-VIE",
-    },
-}
- */
     Ok(())
 }
 
