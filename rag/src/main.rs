@@ -13,8 +13,8 @@ pub use qdrant_client::prelude::Value as QdrantValue;
 use qdrant_client::{
     client::QdrantClient,
     qdrant::{
-        point_id::PointIdOptions, CreateCollection, Distance, SearchPoints, VectorParams,
-        VectorsConfig,
+        point_id::PointIdOptions, value::Kind, CreateCollection, Distance, SearchPoints,
+        VectorParams, VectorsConfig,
     },
 };
 use reqwest::{
@@ -64,7 +64,7 @@ async fn main() -> Result<()> {
         .ok_or_else(|| anyhow::anyhow!("Failed to extract file stem"))?
         .to_string();
 
-    const COLLECTION_NAME: &'static str = "Rag-demo61";
+    const COLLECTION_NAME: &'static str = "Rag-demo70";
 
     let client = QdrantClient::from_url("http://localhost:6334").build()?;
     let _ = client.delete_collection(COLLECTION_NAME);
@@ -119,7 +119,7 @@ async fn main() -> Result<()> {
     println!("Prompt shape: {:?}", prompt_embedding.shape());
     println!("Prompt DIMS: {:?}", prompt_embedding.dims());
 
-    let limit: u64 = 2;
+    let limit: u64 = 3;
     let search_request = SearchPoints {
         collection_name: COLLECTION_NAME.into(),
         vector: prompt_embedding.to_vec1::<f32>()?,
@@ -157,37 +157,45 @@ async fn main() -> Result<()> {
         })
         .collect();
 
-        for r in result{
-            println!("{:?}\n",r);
-        }
+    // for r in result {
+    //     println!("score: {:?}\n", r.score);
+    //     // println!("Chunk:\n{:?}\n", &r.payload.expect("Expected payload from parsed doc.").get("txt_chunk"));
+    //     //Some(Value { kind: Some(StringValue(
+    //     if let Some(val) = r.payload {
+    //         if let Some(val) = val.get("txt_chunk") {
+    //             if let Some(Kind::StringValue(string_value)) = val.kind.clone() {
+    //                 println!("{}", string_value);
+    //             }
+    //         }
+    //     }
+    // }
 
-    let prompt_for_model = r#"
-    {{#chat}}
+    // let prompt_for_model = r#"
+    // {{#chat}}
 
-        {{#system}}
-        You are a highly advanced assistant. You receive a prompt from a user and relevant excerpts extracted from a PDF. You then answer truthfully to the best of your ability. If you do not know the answer, your response is I don't know.
-        {{/system}}
+    //     {{#system}}
+    //     You are a highly advanced assistant. You receive a prompt from a user and relevant excerpts extracted from a PDF. You then answer truthfully to the best of your ability. If you do not know the answer, your response is I don't know.
+    //     {{/system}}
 
-        {{#user}}
-        {{user_prompt}}
-        {{/user}}
+    //     {{#user}}
+    //     {{user_prompt}}
+    //     {{/user}}
 
-        {{#system}}
-        Based on the retrieved information from the PDF, here are the relevant excerpts:
-        
-        {{#each payloads}}
-        {{payloads}}
-        {{/each}}
+    //     {{#system}}
+    //     Based on the retrieved information from the PDF, here are the relevant excerpts:
 
-        Please provide a comprehensive answer to the user's question, integrating insights from these excerpts and your general knowledge.
-        {{/system}}
+    //     {{#each payloads}}
+    //     {{payloads}}
+    //     {{/each}}
 
-    {{/chat}}
-    "#;
+    //     Please provide a comprehensive answer to the user's question, integrating insights from these excerpts and your general knowledge.
+    //     {{/system}}
+
+    // {{/chat}}
+    // "#;
     //TODO: Figure out how to manually parse above r# formated text (or use handlebars) context
 
-
-    //for mistral api
+    //context for mistral api
     // let context = json!({
     //     "user_prompt": &args.prompt,
     //     "payloads": result
@@ -200,7 +208,6 @@ async fn main() -> Result<()> {
     //         .collect::<Vec<String>>()
     // });
 
-
     //TODO: Figure out how to execute() or simplify  (-> MapReduce [MapReducePipeline in orca ] )
 
     //     let pipe = LLMPipeline::new(&mistral)
@@ -211,40 +218,103 @@ async fn main() -> Result<()> {
     //      let res = pipe.execute("query").await?;
 
     // //GROQ message API : https://console.groq.com/docs/text-chat#required-parameters
-    // let api_key = dotenv::var("GROQ_API_KEY").expect("GROQ_API_KEY not set");
-    // let client = Client::new();
+    let api_key = dotenv::var("GROQ_API_KEY").expect("GROQ_API_KEY not set");
+    let client = Client::new();
 
-    // let mut headers = HeaderMap::new();
-    // headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-    // headers.insert(
-    //     AUTHORIZATION,
-    //     HeaderValue::from_str(&format!("Bearer {}", api_key))?,
-    // );
+    let mut headers = HeaderMap::new();
+    headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+    headers.insert(
+        AUTHORIZATION,
+        HeaderValue::from_str(&format!("Bearer {}", api_key))?,
+    );
 
     // //TODO : UPDATE 'GDRANT RESPONSES' with the Vec<Qdrant relevant top N responses>
-    let body = json!({
+    let mut body: serde_json::Value = json!({
         "messages": [{"role":"system","content":"You are a highly advanced assistant. You receive a prompt from a user and relevant excerpts extracted from a text document. You then answer truthfully to the best of your ability. If you do not know the answer, your response is I don't know."},
         {"role": "user", "content": &args.prompt},
-        {"role":"system","content":"Based on the retrieved information from the document, here are the relevant excerpts:{{GDRANT RESPONSES}}Please provide a comprehensive answer to the user's question, integrating insights from these excerpts and your general knowledge."}],
+        {"role":"system","content":"Based on the retrieved information from the document, here are the relevant excerpts:{{payload}}Please provide a comprehensive answer to the user's question, integrating insights from these excerpts and your general knowledge."}],
         "model": "mixtral-8x7b-32768"
     });
 
-    // match client
-    //     .post("https://api.groq.com/openai/v1/chat/completions")
-    //     .headers(headers)
-    //     .json(&body)
-    //     .send()
-    //     .await
-    // {
-    //     Ok(res) => {
-    //         //Got the response
-    //         dbg!(res);
-    //     }
-    //     Err(er) => {
-    //         eprintln!("Error while Requesting GROQ API {er}")
-    //     }
-    // }
+    // // Update the content field in the second message
+    if let serde_json::Value::Array(ref mut messages) = body["messages"] {
+        if let serde_json::Value::String(ref mut content) = messages[2]["content"] {
+            let payloads = result
+                .iter()
+                .filter_map(|r| r.payload.as_ref().and_then(|val| val.get("txt_chunk")))
+                .filter_map(|val| {
+                    val.kind.clone().and_then(|kind| match kind {
+                        Kind::StringValue(string_value) => Some(string_value),
+                        _ => None,
+                    })
+                })
+                .collect::<Vec<String>>();
 
+            let joined_payloads: String = payloads.join("\n");
+            let start = content.find("{{p").unwrap();
+            let end = &start + 12;
+
+            content.replace_range(start..end, &joined_payloads)
+        }
+    }
+
+    match client
+        .post("https://api.groq.com/openai/v1/chat/completions")
+        .headers(headers)
+        .json(&body)
+        .send()
+        .await
+    {
+        Ok(res) => {
+            //Got the response
+            println!("GROQ:\n");
+            dbg!(res);
+        }
+        Err(er) => {
+            eprintln!("Error while Requesting GROQ API:\n {er}")
+        }
+    }
+
+    /* groq response dbg()
+[rag\src\main.rs:271:13] res = Response {
+    url: Url {
+        scheme: "https",
+        cannot_be_a_base: false,
+        username: "",
+        password: None,
+        host: Some(
+            Domain(
+                "api.groq.com",
+            ),
+        ),
+        port: None,
+        path: "/openai/v1/chat/completions",
+        query: None,
+        fragment: None,
+    },
+    status: 200,
+    headers: {
+        "date": "Tue, 09 Apr 2024 13:48:24 GMT",
+        "content-type": "application/json; charset=UTF-8",
+        "transfer-encoding": "chunked",
+        "connection": "keep-alive",
+        "cache-control": "private, max-age=0, no-store, no-cache, must-revalidate",
+        "vary": "Origin, Accept-Encoding",
+        "x-ratelimit-limit-requests": "14400",
+        "x-ratelimit-limit-tokens": "18000",
+        "x-ratelimit-remaining-requests": "14399",
+        "x-ratelimit-remaining-tokens": "16546",
+        "x-ratelimit-reset-requests": "6s",
+        "x-ratelimit-reset-tokens": "4.846666666s",
+        "x-request-id": "req_01hv1hvvxkeyqb2wak3wxr08ag",
+        "via": "1.1 google",
+        "alt-svc": "h3=\":443\"; ma=86400",
+        "cf-cache-status": "DYNAMIC",
+        "server": "cloudflare",
+        "cf-ray": "871af450be525b12-VIE",
+    },
+}
+ */
     Ok(())
 }
 
