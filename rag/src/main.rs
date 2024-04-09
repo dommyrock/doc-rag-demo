@@ -64,7 +64,7 @@ async fn main() -> Result<()> {
         .ok_or_else(|| anyhow::anyhow!("Failed to extract file stem"))?
         .to_string();
 
-    const COLLECTION_NAME: &'static str = "Rag-demo60";
+    const COLLECTION_NAME: &'static str = "Rag-demo61";
 
     let client = QdrantClient::from_url("http://localhost:6334").build()?;
     let _ = client.delete_collection(COLLECTION_NAME);
@@ -129,37 +129,37 @@ async fn main() -> Result<()> {
         ..Default::default()
     };
 
-    println!("[Qdrant] search response:");
     let response = client.search_points(&search_request).await?;
-    dbg!(&response);
+    // dbg!(&response);
 
-    // let result: Vec<FoundPoint> = response
-    //     .result
-    //     .into_iter()
-    //     .filter_map(|scored_point| {
-    //         let id = match scored_point.id {
-    //             Some(point_id) => {
-    //                 match point_id.point_id_options {
-    //                     Some(PointIdOptions::Num(id)) => id,
-    //                     _ => return None, // Ignore other variants or if it's None
-    //                 }
-    //             }
-    //             None => return None, // Skip this point if it doesn't have an ID
-    //         };
-    //         let score = scored_point.score;
-    //         let payload = scored_point.payload;
+    println!("[Qdrant] pretty response:");
+    let result: Vec<FoundPoint> = response
+        .result
+        .into_iter()
+        .filter_map(|scored_point| {
+            let id = match scored_point.id {
+                Some(point_id) => {
+                    match point_id.point_id_options {
+                        Some(PointIdOptions::Num(id)) => id,
+                        _ => return None, // Ignore other variants or if it's None
+                    }
+                }
+                None => return None, // Skip this point if it doesn't have an ID
+            };
+            let score = scored_point.score;
+            let payload = scored_point.payload;
 
-    //         Some(FoundPoint {
-    //             id,
-    //             score,
-    //             payload: Some(payload),
-    //         })
-    //     })
-    //     .collect();
+            Some(FoundPoint {
+                id,
+                score,
+                payload: Some(payload),
+            })
+        })
+        .collect();
 
-    //     for r in result{
-    //         println!("{:?}",r);
-    //     }
+        for r in result{
+            println!("{:?}\n",r);
+        }
 
     let prompt_for_model = r#"
     {{#chat}}
@@ -176,7 +176,7 @@ async fn main() -> Result<()> {
         Based on the retrieved information from the PDF, here are the relevant excerpts:
         
         {{#each payloads}}
-        {{this}}
+        {{payloads}}
         {{/each}}
 
         Please provide a comprehensive answer to the user's question, integrating insights from these excerpts and your general knowledge.
@@ -184,6 +184,8 @@ async fn main() -> Result<()> {
 
     {{/chat}}
     "#;
+    //TODO: Figure out how to manually parse above r# formated text (or use handlebars) context
+
 
     //for mistral api
     // let context = json!({
@@ -198,9 +200,9 @@ async fn main() -> Result<()> {
     //         .collect::<Vec<String>>()
     // });
 
-    //TODO: Figure out how to manually parse above r# formated text (or use handlebars) context
 
     //TODO: Figure out how to execute() or simplify  (-> MapReduce [MapReducePipeline in orca ] )
+
     //     let pipe = LLMPipeline::new(&mistral)
     //     .load_template("query", prompt_for_model)?
     //     .load_context(&OrcaContext::new(context)?)?
@@ -220,12 +222,12 @@ async fn main() -> Result<()> {
     // );
 
     // //TODO : UPDATE 'GDRANT RESPONSES' with the Vec<Qdrant relevant top N responses>
-    // let body = json!({
-    //     "messages": [{"role":"system","content":"You are a highly advanced assistant. You receive a prompt from a user and relevant excerpts extracted from a text document. You then answer truthfully to the best of your ability. If you do not know the answer, your response is I don't know."},
-    //     {"role": "user", "content": &args.prompt},
-    //     {"role":"system","content":"Based on the retrieved information from the document, here are the relevant excerpts:{{GDRANT RESPONSES}}Please provide a comprehensive answer to the user's question, integrating insights from these excerpts and your general knowledge."}],
-    //     "model": "mixtral-8x7b-32768"
-    // });
+    let body = json!({
+        "messages": [{"role":"system","content":"You are a highly advanced assistant. You receive a prompt from a user and relevant excerpts extracted from a text document. You then answer truthfully to the best of your ability. If you do not know the answer, your response is I don't know."},
+        {"role": "user", "content": &args.prompt},
+        {"role":"system","content":"Based on the retrieved information from the document, here are the relevant excerpts:{{GDRANT RESPONSES}}Please provide a comprehensive answer to the user's question, integrating insights from these excerpts and your general knowledge."}],
+        "model": "mixtral-8x7b-32768"
+    });
 
     // match client
     //     .post("https://api.groq.com/openai/v1/chat/completions")

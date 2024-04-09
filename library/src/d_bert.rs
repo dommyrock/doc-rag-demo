@@ -13,7 +13,8 @@ use candle_transformers::models::distilbert::{Config, DistilBertModel};
 use clap::Parser;
 use hf_hub::{api::sync::Api, Repo, RepoType};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use tokenizers::{PaddingParams, PaddingStrategy, Tokenizer};
+use tokenizers::processors::bert::BertProcessing;
+use tokenizers::{Model, PaddingParams, PaddingStrategy, Tokenizer};
 
 use crate::device;
 
@@ -156,6 +157,7 @@ pub fn get_prompt_embeddings(
 
     Ok(embeddings)
 }
+
 pub fn generate_embedding(
     bert_model: &DistilBertModel,
     tokenizer: &Tokenizer,
@@ -188,13 +190,13 @@ pub async fn generate_embeddings(
     txt: String,
     bert_model: &DistilBertModel,
     tokenizer: &mut Tokenizer,
-) -> Result<(Tensor,Vec<String>), E> {
+) -> Result<(Tensor, Vec<String>), E> {
     let device = &bert_model.device;
     let doc_chunks = split_text_into_chunks(300, 80, &txt);
 
     //println!("Doc chunks:\n {:?}",doc_chunks);
 
-    //Add padding
+    //Add padding and special tokens
     if let Some(pp) = tokenizer.get_padding_mut() {
         pp.strategy = tokenizers::PaddingStrategy::BatchLongest
     } else {
@@ -203,6 +205,13 @@ pub async fn generate_embeddings(
             ..Default::default()
         };
         tokenizer.with_padding(Some(pp));
+
+        let sep = tokenizer.get_model().token_to_id("[SEP]").unwrap(); //[101]
+        let cls = tokenizer.get_model().token_to_id("[CLS]").unwrap(); //[102]
+        tokenizer.with_post_processor(BertProcessing::new(
+            (String::from("SEP"), sep),
+            (String::from("CLS"), cls),
+        ));
     }
 
     //Encode all the sentences in parallel
@@ -265,7 +274,7 @@ pub async fn generate_embeddings(
     );
 
     let stacked_embeddings = Tensor::stack(&embeddings_arc, 0)?;
-    Ok((stacked_embeddings,doc_chunks))
+    Ok((stacked_embeddings, doc_chunks))
 }
 
 pub fn split_text_into_chunks(chunk_size: usize, overlap: usize, txt: &str) -> Vec<String> {
@@ -387,31 +396,8 @@ fn get_ones_mask(size: usize, device: &Device) -> Result<Tensor, candle_core::Er
     mask
 }
 
-/*Example special token config
-
-    let sep = tokenizer.get_model().token_to_id("[SEP]").unwrap();//[101]
-    let cls = tokenizer.get_model().token_to_id("[CLS]").unwrap();//[102]
-
-    let tokenizer = tokenizer
-        .with_padding(None)
-        .with_normalizer(BertNormalizer::default())
-        .with_post_processor(BertProcessing::new(
-            (String::from("SEP"), sep),
-            (String::from("CLS"), cls),
-        ))
-        .with_truncation(None)
-        .map_err(E::msg)?;
-
-// Set padding strategy example
-    let pp = tokenizers::PaddingParams {
-        strategy: tokenizers::PaddingStrategy::BatchLongest,
-        ..Default::default()
-    };
-    tokenizer.with_padding(Some(pp));
-
 //There is also special tokes api
 //https://github.com/huggingface/tokenizers/blob/main/tokenizers/tests/common/mod.rs#L41
-*/
 
 /* Dimensionality
 * OpenAI's embeddings have higher dimensionality (1536) compared to DistilBERT (768)
