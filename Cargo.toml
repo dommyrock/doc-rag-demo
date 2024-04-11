@@ -1,5 +1,14 @@
 [workspace]
-members = ["d-bert", "mistral", "jina-bert", "library", "quantized", "rag", "tests"]
+members = [
+   "d-bert",
+   "mistral",
+   "jina-bert",
+   "library",
+   "quantized",
+   "rag",
+   "tests",
+   "gemma",
+]
 resolver = "2"
 
 [workspace.package]
@@ -22,14 +31,14 @@ qdrant-client = "1.8.0"
 rayon = "1.8.0"
 
 #candle
-candle-transformers = { git = "https://github.com/huggingface/candle.git", version = "0.4.2", features = [
+candle-transformers = { git = "https://github.com/huggingface/candle.git", features = [
    "cuda",
 ] }
-candle-core = { git = "https://github.com/huggingface/candle.git", version = "0.4.2", features = [
+candle-core = { git = "https://github.com/huggingface/candle.git", features = [
    "cuda",
 ] }
-candle-nn = { git = "https://github.com/huggingface/candle.git", version = "0.4.2" }
-candle-kernels = { git = "https://github.com/huggingface/candle.git", version = "0.4.2" }
+candle-nn = { git = "https://github.com/huggingface/candle.git" }
+candle-kernels = { git = "https://github.com/huggingface/candle.git" }
 cudarc = { version = "0.10.0", features = ["f16"] }
 
 #hf

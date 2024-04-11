@@ -7,11 +7,7 @@
 # build 
 cargo b
 
-#run
-cargo run -- --prompt "Here is a test sentence"
-
-#run release
-cargo run --release -- --prompt "Here is a test sentence"
+# examples --running inference on different models
 
 #run jina-bert in release (gpu not supported > no cuda implementation for softmax-last-dim)
 cargo run --release --bin jina-bert -- --cpu --prompt "The best thing about coding in rust is "
@@ -25,6 +21,20 @@ cargo run --release --bin quantized -- --which mixtral --prompt "The best thing 
 
 # mistral (i wasn't able to run on 8Gb /dedicated --> Weights > 8gb)
 cargo run --release -- --prompt 'Write helloworld code in Rust' --sample-len 150
+
+# gemma models 
+
+# ACCES Precondiitions > https://github.com/huggingface/candle/tree/main/candle-examples/examples/gemma
+# HF auth CLI: https://huggingface.co/docs/huggingface_hub/guides/cli#getting-started
+
+# 1 pip install -U "huggingface_hub[cli]"
+# 2 huggingface-cli login 
+# 3 copy token from cli URL
+cargo run --bin gemma --release -- --which code-7b-it  --prompt "fn count_primes(max_n: usize)"
+# On <= 2000 series NVDA chips: 
+# Error: DriverError(CUDA_ERROR_NOT_FOUND, "named symbol not found") when loading cast_u32_bf16
+# See: https://github.com/huggingface/candle/issues/1911 (Only supported on RTX 3000+ chips >= 8.0 Compute capabilities)
+
 ```
 
 **TO Resolve cuda runtime issues** see : [Error: Cuda("no cuda implementation for softmax-last-dim")#1330](https://github.com/huggingface/candle/issues/1330)<br>
@@ -36,6 +46,13 @@ cargo run --release -- --prompt 'Write helloworld code in Rust' --sample-len 150
 #2 Run model as normal
 cargo run --release --bin quantized -- --prompt "The best thing about coding in rust is "
 ```
+
+
+#### What are Tensors? 
+- 1) a 1D block of memory called Storage that holds the raw data, and 
+- 2) a View over that storage that holds its shape. PyTorch Internals could be helpful here.
+
+REF: [LLM C - Karpathy repo ](https://github.com/karpathy/llm.c/)
 
 ### Higgingface/candle model examples
 
@@ -103,6 +120,19 @@ output = model(**encoded_input)
 C:\Users\dpolzer\.cache\huggingface\hub
 ```
 
+### GPU monitoring:
+Check your GPU VRAM 
+```bash
+nvidia-smi
+
+# or watch (loops every few sec)
+nvidia-smi -l
+
+# more details
+nvidia-smi --query-gpu=name,compute_cap,driver_version --format=csv
+#(example) NVIDIA GeForce RTX 2070 with Max-Q Design, 7.5, 552.12
+```
+
 <br/>
 <br/>
 <br/>
@@ -132,3 +162,10 @@ distil bert model) <br>
 //or get rid of multiple unwanted dimensions and only keep relevant embeddings in the Tensor 
 .mean((0, 1))?; //was [1,9,768] -? keep 768
 ```
+
+#### Cuda Errors
+
+[Capability docs]()
+
+Docs
+[Cuda compiler driver nvcc](https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/)

@@ -91,14 +91,12 @@ async fn main() -> Result<()> {
     let (model, mut tokenizer) = args.build_model_and_tokenizer()?;
     //v1
     let (e, chunks) = generate_embeddings(text, &model, &mut tokenizer).await?;
-
     let embeddings = e.mean(1)?;
     //V1 Tensor SHAPE [12, 433, 768]
 
     //v2  Generate embeddings for the document chunks (also needs mean removal to keep only last dimension from bert = 768)
     // let embeddings: Vec<candle_core::Tensor> =
     //     tokenize_chunks_get_embeddings(text, model, &mut tokenizer).await?;
-
     println!("Tensor SHAPE {:?}", embeddings.shape());
     println!("Tensor Dimensions {:?}", embeddings.dims());
 
@@ -265,6 +263,10 @@ async fn main() -> Result<()> {
     //final body
     println!("Qdrant chunks:\n{}", serde_json::to_string_pretty(&body).unwrap());
 
+    //TODO: Save responses and whole json query to local context / json document  
+    // --store history /prompts / system prompts to the local sqlite 
+    // -- uncomment and implement local mistral querying instead of just groq
+    
     match client
         .post("https://api.groq.com/openai/v1/chat/completions")
         .headers(headers)
