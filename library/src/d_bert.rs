@@ -206,6 +206,7 @@ pub async fn generate_embeddings(
         };
         tokenizer.with_padding(Some(pp));
 
+        //you can usually find special tokens by looking at model card > vocab.txt
         let sep = tokenizer.get_model().token_to_id("[SEP]").unwrap(); //[101]
         let cls = tokenizer.get_model().token_to_id("[CLS]").unwrap(); //[102]
         tokenizer.with_post_processor(BertProcessing::new(

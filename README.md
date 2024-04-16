@@ -1,6 +1,3 @@
-
-
-
 ### Build / Run
 
 ```bash
@@ -133,6 +130,8 @@ nvidia-smi --query-gpu=name,compute_cap,driver_version --format=csv
 #(example) NVIDIA GeForce RTX 2070 with Max-Q Design, 7.5, 552.12
 ```
 
+[Cuda compiler driver nvcc](https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/)
+
 <br/>
 <br/>
 <br/>
@@ -164,8 +163,9 @@ distil bert model) <br>
 ```
 
 #### Cuda Errors
+[Error: DriverError(CUDA_ERROR_NOT_FOUND, "named symbol not found") when loading cast_f32_bf16#2041](https://github.com/huggingface/candle/issues/2041)
 
-[Capability docs]()
+[Capability docs](https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#compute-capabilities)
 
-Docs
-[Cuda compiler driver nvcc](https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/)
+[CUDA Gpus](https://developer.nvidia.com/cuda-gpus)
+
