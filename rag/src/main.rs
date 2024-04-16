@@ -64,10 +64,21 @@ async fn main() -> Result<()> {
         .ok_or_else(|| anyhow::anyhow!("Failed to extract file stem"))?
         .to_string();
 
-    const COLLECTION_NAME: &'static str = "Rag-demo73";
+    const COLLECTION_NAME: &'static str = "Rag-demo";
 
     let client = QdrantClient::from_url("http://localhost:6334").build()?;
-    let _ = client.delete_collection(COLLECTION_NAME);
+
+    match client.delete_collection(COLLECTION_NAME).await {
+        Ok(_) => println!("Collection {COLLECTION_NAME} deleted successfully"),
+        Err(e) => {
+            if e.to_string().contains("does not exist") {
+                println!("Collection does not exist, proceeding to create it");
+            } else {
+                return Err(e.into());
+            }
+        }
+    }
+
     client
         .create_collection(&CreateCollection {
             collection_name: COLLECTION_NAME.into(),
@@ -231,7 +242,7 @@ async fn main() -> Result<()> {
         {"role":"system","content":"Based on the retrieved information from the document, here are the relevant excerpts:{{payload}}Please provide a comprehensive answer to the user's question, integrating insights from these excerpts and your general knowledge."}],
         "model": "mixtral-8x7b-32768",
         "temperature": 0.8,
-        "max_tokens": 1024,
+        "max_tokens": 4000,//seems enough (ctx is usually shared between prompt and response): https://txt.cohere.com/rerank-3/
         "top_p": 1,
         "stop": null,
         "stream": false
