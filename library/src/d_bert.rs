@@ -171,6 +171,7 @@ pub fn generate_embedding(
         .get_ids()
         .to_vec();
 
+    println!("----------------PROMPT Embeddings------------");
     let token_ids = Tensor::new(&tokens[..], device)?.unsqueeze(0)?;
     println!("token_ids shape: {:?}", token_ids.shape());
     let token_type_ids = token_ids.zeros_like()?;
@@ -179,6 +180,7 @@ pub fn generate_embedding(
     let embedding = bert_model.forward(&token_ids, &token_type_ids)?;
     println!("embedding shape: {:?}", embedding.shape());
     println!("Embedding took {:?} to generate", start.elapsed());
+    println!("----------------PROMPT Embeddings------------\n");
     Ok(embedding)
 }
 
@@ -192,6 +194,7 @@ pub async fn generate_embeddings(
     tokenizer: &mut Tokenizer,
 ) -> Result<(Tensor, Vec<String>), E> {
     let device = &bert_model.device;
+    //You could extract summarization first, than split that to chunks if needed
     let doc_chunks = split_text_into_chunks(300, 80, &txt);
 
     //println!("Doc chunks:\n {:?}",doc_chunks);
@@ -223,6 +226,11 @@ pub async fn generate_embeddings(
         )
         .map_err(E::msg)?;
 
+    //DEMO:
+    println!("Vocab size : {}\n",tokenizer.get_vocab_size(true));
+    // dbg!(&tokens); //quite big
+    println!("Tokens: {:?}\n", tokens.first().unwrap().get_tokens());
+
     let token_ids = tokens
         .iter()
         .enumerate()
@@ -232,6 +240,10 @@ pub async fn generate_embeddings(
             Ok((i, tensor))
         })
         .collect::<Result<Vec<_>>>()?;
+
+    //DEMO
+    // dbg!(&token_ids); //quite big
+    println!("IDS: {:?}\n", tokens.first().unwrap().get_ids());
 
     let embeddings = vec![Tensor::ones((2, 3), candle_core::DType::F32, device)?; token_ids.len()];
 
@@ -247,7 +259,16 @@ pub async fn generate_embeddings(
             let token_type_ids = token_ids.zeros_like()?;
             let embedding = bert_model.forward(token_ids, &token_type_ids)?.squeeze(0)?;
 
+            if *i == 0 {
+                println!(
+                    "Embedding shape {:?}\nEmbedding {}\n",
+                    embedding.dims(),
+                    embedding.get(1)? //last dimension
+                );
+            }
+
             // Lock the mutex and write the embedding to the correct index
+            //.lock() returns a MutexGuard --> which provides a mutable reference to the data
             let mut embeddings = embeddings_arc
                 .lock()
                 .map_err(|e| anyhow!("Mutex error: {}", e))?;
@@ -258,7 +279,7 @@ pub async fn generate_embeddings(
     )?;
 
     println!("Done computing embeddings");
-    println!("Embeddings took {:?} to generate", start.elapsed());
+    println!("Embeddings took {:?} to generate\n", start.elapsed());
 
     // Retrieve the final ordered embeddings
     let embeddings_arc = Arc::try_unwrap(embeddings_arc)
@@ -266,18 +287,11 @@ pub async fn generate_embeddings(
         .into_inner()
         .map_err(|e| anyhow!("Mutex error: {}", e))?;
 
-    //SEE Chunking section  : https://www.mim.ai/fine-tuning-bert-model-for-arbitrarily-long-texts-part-1/
-
-    println!(
-        "Embeddings: \n\n {:?} \n DIMS {:?}",
-        embeddings_arc,
-        embeddings_arc[0].dims()
-    );
-
     let stacked_embeddings = Tensor::stack(&embeddings_arc, 0)?;
     Ok((stacked_embeddings, doc_chunks))
 }
 
+///SEE Chunking section  : https://www.mim.ai/fine-tuning-bert-model-for-arbitrarily-long-texts-part-1/
 pub fn split_text_into_chunks(chunk_size: usize, overlap: usize, txt: &str) -> Vec<String> {
     let words: Vec<&str> = txt.split_whitespace().collect();
     let mut chunks: Vec<String> = vec![];

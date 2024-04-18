@@ -307,9 +307,10 @@ async fn main() -> Result<()> {
 //tokio streaming response example
 //https://www.shuttle.rs/blog/2024/02/28/rag-llm-rust (above wrapping it all up... section)
 
-//cd rag
-//cargo run --bin rag -- --prompt "tell me something about GPU pipeline" --file gpu_pipeline_1.txt
-//cargo run --release --bin rag -- --prompt "tell me something about GPU pipeline" --file gpu_pipeline_1.txt
+// cd rag
+// cargo run --bin rag -- --prompt "tell me something about GPU pipeline" --file gpu_pipeline_1.txt
+// release
+// cargo run --release --bin rag -- --prompt "tell me something about GPU pipeline" --file gpu_pipeline_1.txt
 
 // QDRANT CMD's
 // docker pull qdrant/qdrant
