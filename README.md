@@ -33,6 +33,16 @@ cargo run --bin gemma --release -- --which code-7b-it  --prompt "fn count_primes
 # See: https://github.com/huggingface/candle/issues/1911 (Only supported on RTX 3000+ chips >= 8.0 Compute capabilities)
 
 ```
+#### Update to latest crate version (if current 'candle' is stale)
+```bash
+# 1
+rm -rf target
+# 2 
+cargo update
+# 3
+cargo build
+```
+
 
 **TO Resolve cuda runtime issues** see : [Error: Cuda("no cuda implementation for softmax-last-dim")#1330](https://github.com/huggingface/candle/issues/1330)<br>
 

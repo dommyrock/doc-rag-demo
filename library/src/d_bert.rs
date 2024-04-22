@@ -227,7 +227,7 @@ pub async fn generate_embeddings(
         .map_err(E::msg)?;
 
     //DEMO:
-    println!("Vocab size : {}\n",tokenizer.get_vocab_size(true));
+    println!("Vocab size : {}\n", tokenizer.get_vocab_size(true));
     // dbg!(&tokens); //quite big
     println!("Tokens: {:?}\n", tokens.first().unwrap().get_tokens());
 
