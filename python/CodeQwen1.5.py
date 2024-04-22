@@ -5,7 +5,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 print("Current transformers version:")#or pip show transformers
 print(transformers.__version__) # Has to be [transformers>=4.37.0] (https://huggingface.co/Qwen/CodeQwen1.5-7B-Chat)
 
-# to upadte version
+# Update version if needed
 # pip install --upgrade transformers
 
 device = "cuda"
