@@ -310,7 +310,8 @@ pub fn split_text_into_chunks(chunk_size: usize, overlap: usize, txt: &str) -> V
     chunks
 }
 
-///Custom implementation (didn't quite work, since i ended up with 4dim , but Qdrant Expected 2 when inserting :/ )
+///Custom implementation v2 (needs more data prep to be usefull) <br>
+///didn't quite work, since i ended up with 4dim , but Qdrant Expected 2 when inserting :/
 pub async fn tokenize_chunks_get_embeddings(
     text: String,
     bert_model: DistilBertModel,

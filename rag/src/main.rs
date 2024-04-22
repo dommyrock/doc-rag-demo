@@ -100,15 +100,18 @@ async fn main() -> Result<()> {
     dbg!(coll);
 
     let (model, mut tokenizer) = args.build_model_and_tokenizer()?;
-    //v1
-    let (e, chunks) = generate_embeddings(text, &model, &mut tokenizer).await?;
-    let embeddings = e.mean(1)?;
-    //V1 Tensor SHAPE [12, 433, 768]
 
-    //v2  Generate embeddings for the document chunks (also needs mean removal to keep only last dimension from bert = 768)
-    // let embeddings: Vec<candle_core::Tensor> =
-    //     tokenize_chunks_get_embeddings(text, model, &mut tokenizer).await?;
-    println!("Tensor SHAPE {:?}", embeddings.shape());
+    let (e, chunks) = generate_embeddings(text, &model, &mut tokenizer).await?;
+
+    println!("Tensor SHAPE Before Collapsing{:?}", e.shape()); //Tensor SHAPE [12, 433, 768]
+
+    /* Mean note
+    By taking the mean along the token axis, you're essentially collapsing the information from all tokens in each chunk into a single vector.
+    This might lead to a loss of information, especially if the tokens in each chunk have distinct meanings or contexts.
+    */
+    let embeddings = e.mean(1)?;
+
+    println!("Tensor SHAPE {:?}", embeddings.shape()); //Tensor SHAPE [12,768]
     println!("Tensor Dimensions {:?}", embeddings.dims());
 
     //Vector store
@@ -140,7 +143,6 @@ async fn main() -> Result<()> {
 
     let response = client.search_points(&search_request).await?;
 
-    println!("[Qdrant] pretty response:");
     let result: Vec<FoundPoint> = response
         .result
         .into_iter()
@@ -165,6 +167,8 @@ async fn main() -> Result<()> {
         })
         .collect();
 
+    // println!("[Qdrant] pretty response:");
+
     // for r in result {
     //     println!("score: {:?}\n", r.score);
     //     // println!("Chunk:\n{:?}\n", &r.payload.expect("Expected payload from parsed doc.").get("txt_chunk"));
@@ -178,54 +182,7 @@ async fn main() -> Result<()> {
     //     }
     // }
 
-    // let prompt_for_model = r#"
-    // {{#chat}}
-
-    //     {{#system}}
-    //     You are a highly advanced assistant. You receive a prompt from a user and relevant excerpts extracted from a PDF. You then answer truthfully to the best of your ability. If you do not know the answer, your response is I don't know.
-    //     {{/system}}
-
-    //     {{#user}}
-    //     {{user_prompt}}
-    //     {{/user}}
-
-    //     {{#system}}
-    //     Based on the retrieved information from the PDF, here are the relevant excerpts:
-
-    //     {{#each payloads}}
-    //     {{payloads}}
-    //     {{/each}}
-
-    //     Please provide a comprehensive answer to the user's question, integrating insights from these excerpts and your general knowledge.
-    //     {{/system}}
-
-    // {{/chat}}
-    // "#;
-    //TODO: Figure out how to manually parse above r# formated text (or use handlebars) context
-
-    //context for mistral api
-    // let context = json!({
-    //     "user_prompt": &args.prompt,
-    //     "payloads": result
-    //         .iter()
-    //         .filter_map(|found_point| {
-    //             found_point.payload.as_ref().map(|payload| {
-    //                 serde_json::to_string(payload).unwrap_or_else(|_| "{}".to_string())
-    //             })
-    //         })
-    //         .collect::<Vec<String>>()
-    // });
-
-    //TODO: Figure out how to execute() or simplify  (-> MapReduce [MapReducePipeline in orca ] )
-
-    //     let pipe = LLMPipeline::new(&mistral)
-    //     .load_template("query", prompt_for_model)?
-    //     .load_context(&OrcaContext::new(context)?)?
-    //     .load_memory(Buffer::new());
-
-    //      let res = pipe.execute("query").await?;
-
-    // //GROQ message API : https://console.groq.com/docs/text-chat#required-parameters
+    //GROQ message API : https://console.groq.com/docs/text-chat#required-parameters
     let api_key = dotenv::var("GROQ_API_KEY").expect("GROQ_API_KEY not set");
     let client = Client::new();
 
@@ -251,7 +208,6 @@ async fn main() -> Result<()> {
     // Update Prompt template
     if let serde_json::Value::Array(ref mut messages) = body["messages"] {
         if let serde_json::Value::String(ref mut content) = messages[2]["content"] {
-            
             //Strip Qdrant Type wrappers
             let payloads = result
                 .iter()
@@ -271,13 +227,17 @@ async fn main() -> Result<()> {
             content.replace_range(start..end, &joined_payloads)
         }
     }
-    //final body
-    println!("Qdrant chunks:\n{}", serde_json::to_string_pretty(&body).unwrap());
 
-    //TODO: Save responses and whole json query to local context / json document  
-    // --store history /prompts / system prompts to the local sqlite 
+    //final body
+    println!(
+        "Qdrant chunks:\n{}",
+        serde_json::to_string_pretty(&body).unwrap()
+    );
+
+    //TODO: Save responses and whole json query to local context / json document
+    // --store history /prompts / system prompts to the local sqlite
     // -- uncomment and implement local mistral querying instead of just groq
-    
+
     match client
         .post("https://api.groq.com/openai/v1/chat/completions")
         .headers(headers)
@@ -303,6 +263,8 @@ async fn main() -> Result<()> {
     }
     Ok(())
 }
+
+//NOTES:
 
 //tokio streaming response example
 //https://www.shuttle.rs/blog/2024/02/28/rag-llm-rust (above wrapping it all up... section)
