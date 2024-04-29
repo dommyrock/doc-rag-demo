@@ -1,3 +1,11 @@
+### RAG demo 
+Built for the conf. talk which I held live for Engineering division @ Endava. <br>
+The Goal was to make intro for Embeddings, Tensors, Quantization, RAG and other common ML concepts.  
+[Presentation link](https://docs.google.com/presentation/d/1uLduPzqwCAdkqT1DzDZ5eD7_aLG9D6Ar/edit?usp=drive_link&ouid=110719831662336020514&rtpof=true&sd=true)
+
+![image](https://github.com/dommyrock/doc-rag-demo/assets/32032778/6c46dc5a-2a4c-4ec0-a737-799aefc4879b)
+
+
 ### Build / Run
 
 ```bash
