@@ -1,3 +1,12 @@
+# Note
+
+**.env** file is required for ./rag project
+
+```bash
+GROQ_API_KEY=<YOUR_API_KEY>
+# Any other Api / inference endpoint keys should be here
+```
+
 ### Build / Run
 
 ```bash
